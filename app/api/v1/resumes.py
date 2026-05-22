@@ -14,7 +14,7 @@ from app.services.file_validator import FileValidationService, ValidatedFile
 from app.services.resume_parsing_service import ResumeParsingService
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/resumes", tags=["resumes"])
+router = APIRouter()
 
 # ── Dependency providers ──────────────────────────────────────────────────────
 

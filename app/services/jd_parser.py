@@ -23,6 +23,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.core.logging import get_logger
+from app.utils.normalization import normalize_skill
 from app.schemas.match import ParsedJobDescription, RequiredSkill, SeniorityLevel
 from app.schemas.resume import SkillCategory
 
@@ -58,14 +59,16 @@ _SKILL_TAXONOMY: dict[SkillCategory, list[str]] = {
     SkillCategory.SOFT: [
         "communication", "leadership", "problem solving", "teamwork",
         "project management", "agile", "scrum", "kanban", "mentoring",
-        "stakeholder management", "cross-functional", "collaboration",
+        "stakeholder management", "cross-functional", "collaboration", "product strategy", "user research",
+        "analytics", "roadmapping", "prioritization", "a/b testing", "product management",
+        "feature execution", "user engagement",
     ],
 }
 
 _SKILL_LOOKUP: dict[str, SkillCategory] = {}
 for _cat, _names in _SKILL_TAXONOMY.items():
     for _name in _names:
-        _SKILL_LOOKUP[_name.lower()] = _cat
+        _SKILL_LOOKUP[normalize_skill(_name)] = _cat
 
 # ── Pre-compiled patterns ──────────────────────────────────────────────────────
 
@@ -214,14 +217,14 @@ class JDParser:
         )
 
         logger.info(
-            f"jd_parse_complete | "
-            f"title={title} | "
-            f"required_skills_count={len(required_skills)} | "
-            f"preferred_skills_count={len(preferred_skills)} | "
-            f"min_years={min_years} | "
-            f"seniority={seniority}",
-            confidence=confidence,
-        )
+    f"jd_parse_complete | "
+    f"title={title} | "
+    f"required_skills_count={len(required_skills)} | "
+    f"preferred_skills_count={len(preferred_skills)} | "
+    f"min_years={min_years} | "
+    f"seniority={seniority} | "
+    
+)
 
         return ParsedJobDescription(
             title=title,
@@ -302,15 +305,28 @@ class JDParser:
         if hint:
             return hint.strip()
 
-        # Heuristic: first short, non-bullet line that looks like a title
+        # Pattern-based extraction
+        patterns = [
+            r"looking for a[n]?\s+([A-Z][A-Za-z\s]{2,40}?)(?:\s+with|\s+who|\s*,|\.)",
+            r"hiring a[n]?\s+([A-Z][A-Za-z\s]{2,40}?)(?:\s+with|\s+who|\s*,|\.)",
+            r"position[:\-]?\s+([A-Z][A-Za-z\s]{2,40})",
+            r"role[:\-]?\s+([A-Z][A-Za-z\s]{2,40})",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+
+        # Fallback heuristic
         for line in text.splitlines():
             stripped = line.strip()
+
             if not stripped or stripped.startswith(("•", "-", "*")):
                 continue
+
             if 3 < len(stripped) < 80:
-                # Avoid lines that are obviously sentences (contain a verb pattern)
-                if not re.search(r"\b(?:we are|we're|our team|join us)\b", stripped, re.IGNORECASE):
-                    return stripped
+                return stripped
 
         return "Unknown Position"
 
@@ -334,7 +350,7 @@ class JDParser:
             line_is_preferred = bool(_PREFERRED_SIGNAL.search(line))
             target = preferred if line_is_preferred else required
             for skill in skills:
-                key = skill.name.lower()
+                key = normalize_skill(skill.name)
                 if key not in required and key not in preferred:
                     target[key] = skill
 
@@ -342,37 +358,50 @@ class JDParser:
         for line in sections.preferred_lines:
             skills = self._skills_in_line(line)
             for skill in skills:
-                key = skill.name.lower()
+                key = normalize_skill(skill.name)
                 if key not in required and key not in preferred:
                     skill.is_required = False
                     preferred[key] = skill
 
         # Pass 3: full text scan for anything missed
+        # Pass 3: full text scan for anything missed
         all_found = set(required.keys()) | set(preferred.keys())
+
         for line in sections.full_lines:
             skills = self._skills_in_line(line)
+
             for skill in skills:
-                key = skill.name.lower()
+                key = normalize_skill(skill.name)
+
                 if key not in all_found:
-                    # Classify by signals in the surrounding line
-                    if _REQUIRED_SIGNAL.search(line):
-                        required[key] = skill
-                    else:
+
+                    # If line has preferred signals
+                    if _PREFERRED_SIGNAL.search(line):
                         skill.is_required = False
                         preferred[key] = skill
+
+                    # Otherwise default to REQUIRED
+                    else:
+                        skill.is_required = True
+                        required[key] = skill
+
                     all_found.add(key)
 
         return list(required.values()), list(preferred.values())
 
     def _skills_in_line(self, line: str) -> list[RequiredSkill]:
         """Scan a single line for skill taxonomy matches."""
+
         found: list[RequiredSkill] = []
-        line_lower = line.lower()
+
+        normalized_line = normalize_skill(line)
 
         for skill_name, category in _SKILL_LOOKUP.items():
-            # Word-boundary match to avoid "go" matching "good"
-            if re.search(r"\b" + re.escape(skill_name) + r"\b", line_lower):
+
+            if skill_name in normalized_line:
+
                 years = self._extract_years_for_skill(line, skill_name)
+
                 found.append(
                     RequiredSkill(
                         name=skill_name,
@@ -383,7 +412,6 @@ class JDParser:
                 )
 
         return found
-
     def _extract_years_for_skill(self, line: str, skill_name: str) -> float | None:
         """
         Try to extract years requirement next to a skill mention.
@@ -473,7 +501,7 @@ class JDParser:
         requires_degree = bool(_DEGREE_KEYWORDS.search(search_text))
 
         preferred_fields: list[str] = []
-        text_lower = search_text.lower()
+        text_lower = normalize_skill(text)
         for field in _DEGREE_FIELD_KEYWORDS:
             if field in text_lower:
                 preferred_fields.append(field)
@@ -495,13 +523,15 @@ class JDParser:
 
         # From skills
         for skill in extracted_skills:
-            keywords.add(skill.name.lower())
+            keywords.add(normalize_skill(skill.name))
 
         # Scan full text for taxonomy terms
-        text_lower = text.lower()
+        text_lower = normalize_skill(text)
         for term in _SKILL_LOOKUP:
-            if re.search(r"\b" + re.escape(term) + r"\b", text_lower):
-                keywords.add(term)
+            normalized_term = normalize_skill(term)
+
+            if normalized_term in text_lower:
+                keywords.add(normalized_term)
 
         # Domain keywords (non-skill but important for matching)
         domain_terms = {
@@ -512,8 +542,9 @@ class JDParser:
             "code review", "technical leadership", "architecture",
         }
         for term in domain_terms:
-            if re.search(r"\b" + re.escape(term) + r"\b", text_lower):
-                keywords.add(term)
+            normalized_term = normalize_skill(term)
+            if re.search(r"\b" + re.escape(normalized_term) + r"\b", text_lower):
+                keywords.add(normalized_term)
 
         return sorted(keywords)
 

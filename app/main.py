@@ -19,6 +19,7 @@ from app.core.error_handlers import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.api.v1.router import router as api_v1_router
 from app.api.v1.job_descriptions import router as job_description_router
+from app.api.v1 import matches
 
 
 @asynccontextmanager
@@ -65,11 +66,7 @@ def create_app() -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(api_v1_router)
-    app.include_router(
-        job_description_router,
-        prefix="/job-descriptions",
-        tags=["Job Descriptions"]
-)
+    
     # ── Health check ─────────────────────────────────────────────────────────
     @app.get("/health", tags=["ops"], include_in_schema=False)
     async def health_check():

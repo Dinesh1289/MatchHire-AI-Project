@@ -25,7 +25,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from functools import cached_property
-
+from app.utils.normalization import normalize_skill
 from app.core.logging import get_logger
 from app.schemas.match import (
     MatchResult,
@@ -214,7 +214,7 @@ class MatchingEngine:
         # ── Required skills ───────────────────────────────────────────────────
         matched_required = 0
         for jd_skill in required_skills:
-            key = jd_skill.name.lower()
+            key = normalize_skill(jd_skill.name)
             candidate_skill = self._find_candidate_skill(resume, key)
             if self._skill_matches(key, resume_skill_names):
                 matched_required += 1
@@ -240,7 +240,7 @@ class MatchingEngine:
         # ── Preferred skills ──────────────────────────────────────────────────
         matched_preferred = 0
         for jd_skill in preferred_skills:
-            key = jd_skill.name.lower()
+            key = normalize_skill(jd_skill.name)
             if self._skill_matches(key, resume_skill_names):
                 matched_preferred += 1
                 candidate_skill = self._find_candidate_skill(resume, key)
@@ -264,7 +264,7 @@ class MatchingEngine:
         # ── Bonus skills (candidate has; JD doesn't mention) ─────────────────
         jd_all = jd.all_skill_names
         for skill in resume.skills:
-            if skill.name.lower() not in jd_all and skill.category in (
+            if normalize_skill(skill.name) not in jd_all and skill.category in (
                 SkillCategory.LANGUAGE, SkillCategory.TECHNICAL
             ):
                 bonus.append(skill.name)
@@ -470,8 +470,8 @@ class MatchingEngine:
             raw_score = 0.7  # Neutral if JD has no extractable keywords
             explanation = "No JD keywords extracted — neutral score applied."
         else:
-            resume_kws = set(resume.ats_keywords)
-            jd_kws = set(jd.keywords)
+            resume_kws = {normalize_skill(k) for k in resume.ats_keywords}
+            jd_kws = {normalize_skill(k) for k in jd.keywords}
             matched_kws = resume_kws & jd_kws
             raw_score = round(len(matched_kws) / len(jd_kws), 4)
             explanation = (
@@ -770,44 +770,52 @@ class MatchingEngine:
 
     def _candidate_skill_set(self, resume: ParsedResume) -> set[str]:
         """
-        Build a flat set of normalised skill names from the resume.
+        Build a flat set of normalized skill names from the resume.
         Also includes technology names found in work experience bullets.
         """
+
         skill_names: set[str] = set()
 
+        # Resume skills
         for skill in resume.skills:
-            skill_names.add(skill.name.lower())
+            skill_names.add(
+                normalize_skill(skill.name)
+            )
 
+        # Work experience technologies
         for exp in resume.work_experience:
             for tech in exp.technologies:
-                skill_names.add(tech.lower())
+                skill_names.add(
+                    normalize_skill(tech)
+                )
 
+        # Project technologies
         for project in resume.projects:
             for tech in project.technologies:
-                skill_names.add(tech.lower())
+                skill_names.add(
+                    normalize_skill(tech)
+                )
 
         return skill_names
 
     def _skill_matches(self, jd_skill_key: str, candidate_skills: set[str]) -> bool:
-        """
-        Match with aliasing: "node.js" also matches "nodejs", "node js".
-        """
-        if jd_skill_key in candidate_skills:
-            return True
-        # Alias check: strip dots, slashes, spaces
-        normalised = re.sub(r"[.\s/]", "", jd_skill_key)
-        for c_skill in candidate_skills:
-            if re.sub(r"[.\s/]", "", c_skill) == normalised:
-                return True
-        return False
+        normalized_jd_skill = normalize_skill(jd_skill_key)
+
+        return normalized_jd_skill in {
+            normalize_skill(skill)
+            for skill in candidate_skills
+        }
 
     def _find_candidate_skill(
         self, resume: ParsedResume, skill_key: str
     ) -> Skill | None:
         """Find the Skill object from the resume by normalised name."""
+        normalized_key = normalize_skill(skill_key)
+
         for skill in resume.skills:
-            if skill.name.lower() == skill_key:
+            if normalize_skill(skill.name) == normalized_key:
                 return skill
+
         return None
 
     def _years_sufficient(

@@ -13,7 +13,7 @@ from app.services.jd_parser import JDParser
 from app.services.matching_engine import MatchingEngine
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/matches", tags=["matches"])
+router = APIRouter()
 
 
 # ── Dependency providers ──────────────────────────────────────────────────────
@@ -97,7 +97,10 @@ async def analyze_match(
             company_name=request.company_name,
         )
     except Exception as exc:
-        logger.error("jd_parse_failed", error=str(exc), exc_info=True)
+        logger.error(
+    f"jd_parse_failed | error={str(exc)}",
+    exc_info=True
+)
         raise ParseError(
             "Failed to parse the job description.",
             detail=str(exc),
