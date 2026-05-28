@@ -501,7 +501,7 @@ class JDParser:
         requires_degree = bool(_DEGREE_KEYWORDS.search(search_text))
 
         preferred_fields: list[str] = []
-        text_lower = normalize_skill(text)
+        text_lower = normalize_skill(full_text)
         for field in _DEGREE_FIELD_KEYWORDS:
             if field in text_lower:
                 preferred_fields.append(field)

@@ -1,19 +1,14 @@
 # Python
-venv/
-.venv/
 __pycache__/
 *.pyc
-
-# Node
-node_modules/
-
-# Build
-dist/
-build/
-.next/
 
 # Environment
 .env
 
-# VS Code
-.vscode/
+# Virtual Environment
+venv/
+.env/
+
+# OS files
+.DS_Store
+Thumbs.db
