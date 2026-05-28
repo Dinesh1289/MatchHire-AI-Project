@@ -138,10 +138,9 @@ Input:
 - Product Manager JD
 
 Output:
-- Match Score: 78%
+- Match Score: 45%
 - Skill Gap Analysis
 - ATS Keyword Match
-- Personalized Recommendation
 
 ---
 
