@@ -1,25 +1,29 @@
 # Python
-Backend/__pycache__/
-Backend/*.pyc
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Backend
 Backend/.env
 Backend/venv/
 Backend/.pytest_cache/
 
-# Node
+# Frontend
 Frontend/node_modules/
 Frontend/.next/
 Frontend/out/
 
+# Environment
+.env
+.env.local
+
 # Logs
 *.log
-
-# OS
-.DS_Store
-Thumbs.db
 
 # VS Code
 .vscode/
 
-# Environment
-.env
-.env.local
+# OS Files
+.DS_Store
+Thumbs.db
