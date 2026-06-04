@@ -81,13 +81,53 @@ const strengths =
 const weaknesses =
   result?.weaknesses?.map((w: any) => w.title) ?? []
 
-const recommendations = []
+const recommendations =
+  result?.recommendation?.next_steps?.map(
+    (step: string, index: number) => ({
+      id: `rec-${index}`,
+      type: 'skill_gap',
+      priority: 'high',
+      title: step,
+      description: step,
+    })
+  ) ?? []
 
-const ats_keywords = []
+const ats_keywords =
+  result?.parsed_jd?.keywords?.map((keyword: string) => ({
+    keyword,
+    found:
+      matching_skills.some(
+        (skill: any) =>
+          skill.name?.toLowerCase() === keyword.toLowerCase()
+      ),
+    frequency: 1,
+    importance: 'medium',
+  })) ?? []
 
-const ats_coverage_percentage = 0
+const ats_coverage_percentage =
+  ats_keywords.length > 0
+    ? Math.round(
+        (ats_keywords.filter((k: any) => k.found).length /
+          ats_keywords.length) *
+          100
+      )
+    : 0
 
-const skill_breakdown = []
+const skill_breakdown = [
+  ...matching_skills.map((skill: any) => ({
+    skill: skill.name,
+    present: true,
+    score: 100,
+    category: skill.category ?? 'technical',
+  })),
+
+  ...missing_skills.map((skill: any) => ({
+    skill: skill.name,
+    present: false,
+    score: 0,
+    category: skill.category ?? 'technical',
+  })),
+]
 
 const job_insights = {
   title: result?.parsed_jd?.title,
@@ -234,7 +274,17 @@ const created_at = new Date().toISOString()
                 keywords={ats_keywords}
                 coveragePercentage={ats_coverage_percentage}
               /> */}
-              <div>ATS Section Placeholder</div>
+              <ATSSection
+                keywords={
+                  result?.parsed_jd?.keywords?.map((keyword: string) => ({
+                    keyword,
+                    found: true,
+                    frequency: 1,
+                    importance: 'medium',
+                  })) ?? []
+                }
+                coveragePercentage={ats_score}
+              />
             </div>
           </motion.div>
         </div>
@@ -249,7 +299,19 @@ const created_at = new Date().toISOString()
         <motion.div variants={cardVariants}>
           <div className="rounded-2xl border border-border bg-card p-6">
             {/* <RecommendationsSection recommendations={recommendations} /> */}
-            <div>Recommendations Placeholder</div>
+            <RecommendationsSection
+              recommendations={
+                result?.recommendation?.next_steps?.map(
+                  (step: string, index: number) => ({
+                    id: String(index),
+                    title: step,
+                    description: step,
+                    priority: 'medium',
+                    type: 'skill_gap',
+                  })
+                ) ?? []
+              }
+            />
           </div>
         </motion.div>
 

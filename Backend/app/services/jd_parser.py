@@ -61,7 +61,11 @@ _SKILL_TAXONOMY: dict[SkillCategory, list[str]] = {
         "project management", "agile", "scrum", "kanban", "mentoring",
         "stakeholder management", "cross-functional", "collaboration", "product strategy", "user research",
         "analytics", "roadmapping", "prioritization", "a/b testing", "product management",
-        "feature execution", "user engagement",
+        "feature execution", "user engagement","product management","product strategy","roadmapping","stakeholder management",
+        "user research","agile","scrum","market research","customer success","sales",
+        "crm","salesforce","hubspot","business development","recruitment","talent acquisition",
+        "human resources","marketing","digital marketing","seo","content marketing","campaign management",
+        "data analysis","excel","power bi",
     ],
 }
 
@@ -302,34 +306,82 @@ class JDParser:
     # ── Title extraction ──────────────────────────────────────────────────────
 
     def _extract_title(self, text: str, hint: str | None) -> str:
+        """
+        Extract job title from JD.
+
+        Priority:
+        1. User supplied title_hint
+        2. First meaningful line
+        3. Pattern extraction
+        """
+
         if hint:
             return hint.strip()
 
-        # Pattern-based extraction
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+        # Common garbage headers we don't want as titles
+        skip_phrases = {
+            "job description",
+            "about us",
+            "about the company",
+            "responsibilities",
+            "requirements",
+            "qualifications",
+            "preferred qualifications",
+            "what you'll do",
+            "what you will do",
+            "overview",
+            "summary",
+        }
+
+        # First meaningful short line is usually the title
+        for line in lines[:10]:
+
+            line_lower = line.lower()
+
+            if line_lower in skip_phrases:
+                continue
+
+            # avoid huge paragraphs
+            if len(line.split()) <= 8 and len(line) <= 80:
+
+                common_titles = [
+                    "engineer",
+                    "developer",
+                    "scientist",
+                    "analyst",
+                    "manager",
+                    "architect",
+                    "consultant",
+                    "specialist",
+                    "designer",
+                    "administrator",
+                    "director",
+                    "product manager",
+                    "data engineer",
+                    "data scientist",
+                    "software engineer",
+                ]
+
+                if any(title in line_lower for title in common_titles):
+                    return line
+
+        # Backup regex patterns
         patterns = [
-            r"looking for a[n]?\s+([A-Z][A-Za-z\s]{2,40}?)(?:\s+with|\s+who|\s*,|\.)",
-            r"hiring a[n]?\s+([A-Z][A-Za-z\s]{2,40}?)(?:\s+with|\s+who|\s*,|\.)",
-            r"position[:\-]?\s+([A-Z][A-Za-z\s]{2,40})",
-            r"role[:\-]?\s+([A-Z][A-Za-z\s]{2,40})",
+            r"position[:\-]?\s+([A-Za-z\s]{3,60})",
+            r"role[:\-]?\s+([A-Za-z\s]{3,60})",
+            r"title[:\-]?\s+([A-Za-z\s]{3,60})",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
+
             if match:
                 return match.group(1).strip()
 
-        # Fallback heuristic
-        for line in text.splitlines():
-            stripped = line.strip()
-
-            if not stripped or stripped.startswith(("•", "-", "*")):
-                continue
-
-            if 3 < len(stripped) < 80:
-                return stripped
-
         return "Unknown Position"
-
+        
     # ── Skill extraction ──────────────────────────────────────────────────────
 
     def _extract_skills(

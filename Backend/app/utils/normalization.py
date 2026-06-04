@@ -1,29 +1,9 @@
-"""
-Normalization utilities for matching engine.
-"""
-
-
-SKILL_SYNONYMS = {
-    "pm": "product management",
-    "product mgr": "product management",
-    "js": "javascript",
-    "py": "python",
-    "postgres": "postgresql",
-    "node": "nodejs",
-    "ml": "machine learning",
-}
-
+from app.utils.skill_synonyms import SKILL_SYNONYMS
 
 def normalize_skill(skill: str) -> str:
-    """
-    Normalize skill names for reliable matching.
-    """
+    if not skill:
+        return ""
 
-    normalized = (
-        skill.strip()
-        .lower()
-        .replace("-", " ")
-        .replace(".", "")
-    )
+    skill = skill.lower().strip()
 
-    return SKILL_SYNONYMS.get(normalized, normalized)
+    return SKILL_SYNONYMS.get(skill, skill)

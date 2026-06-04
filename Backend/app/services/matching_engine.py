@@ -27,6 +27,9 @@ from dataclasses import dataclass
 from functools import cached_property
 from app.utils.normalization import normalize_skill
 from app.core.logging import get_logger
+from rapidfuzz import fuzz
+from app.utils.education_mapper import DEGREE_PATTERNS
+from app.utils.title_families import TITLE_FAMILIES
 from app.schemas.match import (
     MatchResult,
     ParsedJobDescription,
@@ -97,7 +100,7 @@ class MatchingEngine:
         result = engine.analyze(parsed_resume, parsed_jd)
     """
 
-    ENGINE_VERSION = "1.0.0"
+    ENGINE_VERSION = "1.1.0"
 
     def analyze(
         self,
@@ -425,13 +428,29 @@ class MatchingEngine:
                 union = c_tokens | j_tokens
                 jaccard = len(intersection) / len(union)
 
+                candidate_family = self._title_family(candidate_title)
+
+                jd_family = self._title_family(jd_title)
+
+                family_match = (
+                    candidate_family
+                    and jd_family
+                    and candidate_family == jd_family
+                )
+
                 # Boost for direct substring match (e.g. "engineer" in both)
                 if c_tokens & j_tokens:
                     boost = min(0.2, len(intersection) * 0.1)
                 else:
                     boost = 0.0
 
-                raw_score = min(1.0, round(jaccard + boost, 4))
+                raw_score = min(
+                    1.0,
+                    round(jaccard + boost, 4)
+                )
+
+                if family_match:
+                    raw_score = max(raw_score, 0.8)
                 explanation = (
                     f"Title overlap: '{candidate_title}' vs '{jd_title}'. "
                     f"Shared tokens: {sorted(intersection) or 'none'}."
@@ -510,12 +529,11 @@ class MatchingEngine:
         else:
             has_degree = any(
                 edu.degree and any(
-                    kw in edu.degree.lower()
-                    for kw in ("bachelor", "master", "phd", "b.s", "m.s", "b.e", "m.e", "b.tech")
+                    degree_pattern in edu.degree.lower()
+                    for degree_pattern in DEGREE_PATTERNS
                 )
                 for edu in resume.education
             )
-
             if has_degree:
                 # Check field match
                 if jd.preferred_degree_fields:
@@ -767,7 +785,17 @@ class MatchingEngine:
     # ══════════════════════════════════════════════════════════════════════════
     # Utilities
     # ══════════════════════════════════════════════════════════════════════════
+    def _title_family(self, title: str):
 
+        title = title.lower()
+
+        for known_title, family in TITLE_FAMILIES.items():
+
+            if known_title in title:
+                return family
+
+        return None
+        
     def _candidate_skill_set(self, resume: ParsedResume) -> set[str]:
         """
         Build a flat set of normalized skill names from the resume.
@@ -799,13 +827,29 @@ class MatchingEngine:
         return skill_names
 
     def _skill_matches(self, jd_skill_key: str, candidate_skills: set[str]) -> bool:
-        normalized_jd_skill = normalize_skill(jd_skill_key)
 
-        return normalized_jd_skill in {
+        jd_skill_key = normalize_skill(jd_skill_key)
+
+        normalized_candidate_skills = {
             normalize_skill(skill)
             for skill in candidate_skills
         }
 
+        if jd_skill_key in normalized_candidate_skills:
+            return True
+
+        for skill in normalized_candidate_skills:
+
+            similarity = fuzz.ratio(
+                jd_skill_key.lower(),
+                skill.lower()
+            )
+
+            if similarity >= 90:
+                return True
+
+        return False
+        
     def _find_candidate_skill(
         self, resume: ParsedResume, skill_key: str
     ) -> Skill | None:

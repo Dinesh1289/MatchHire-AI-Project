@@ -93,8 +93,7 @@ async def analyze_match(
     try:
         parsed_jd = jd_parser.parse(
             raw_text=request.jd_text,
-            title_hint=request.job_title_hint,
-            company_name=request.company_name,
+            title_hint=request.job_title_hint
         )
     except Exception as exc:
         logger.error(

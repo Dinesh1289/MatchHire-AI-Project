@@ -88,7 +88,7 @@ export function useMatchAnalysis() {
         setMatchResult(matchResult)
 
         // Navigate to results
-        router.push('/results/demo')
+        router.push('/results/analysis')
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Something went wrong. Please try again.'
