@@ -77,6 +77,13 @@ def create_app() -> FastAPI:
 
     return app
 
+    @app.get("/")
+    def root():
+        return {
+            "message": "MatchHire AI Backend Running",
+            "status": "healthy"
+        }
+
 
 # Module-level app for uvicorn/gunicorn entrypoint
 app = create_app()
